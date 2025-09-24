@@ -9,6 +9,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.draganddrop.dragAndDropSource
 import androidx.compose.foundation.draganddrop.dragAndDropTarget
@@ -24,6 +25,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material3.Card
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Scaffold
@@ -32,6 +34,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draganddrop.DragAndDropEvent
 import androidx.compose.ui.draganddrop.DragAndDropTarget
@@ -39,6 +42,8 @@ import androidx.compose.ui.draganddrop.DragAndDropTransferData
 import androidx.compose.ui.draganddrop.mimeTypes
 import androidx.compose.ui.draganddrop.toAndroidDragEvent
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
@@ -47,17 +52,22 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            MainScaffold()
+            MainScreen()
         }
     }
 }
 
 @Composable
-fun MainScaffold() {
-    val components = remember { mutableStateListOf<String>() }
+fun MainScreen() {
+    val cardsImages = remember { mutableStateListOf<Int>() }
+    val cardsLabels = remember { mutableStateListOf<String>() }
+    val cardsCombinedInfo = cardsImages.zip(cardsLabels) { image, label ->
+        Pair(image, label)
+    }
+//    val density = LocalDensity.current
     Scaffold(
         floatingActionButton = {
-            FloatingActionButton(onClick = { components.add("Component ${components.size}") }) {
+            FloatingActionButton(onClick = { addCard(cardsLabels, cardsImages) }) {
                 Icon(Icons.Default.Add, contentDescription = "Add")
             }
         }
@@ -70,24 +80,29 @@ fun MainScaffold() {
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
 
-            itemsIndexed(components) { index, component ->
-                key(component) {
-                    Row(
+            itemsIndexed(cardsCombinedInfo) { index, (image, label) ->
+                key(label, image) {
+                    Card(
+                        shape = RectangleShape,
                         modifier = Modifier
-                                .background(Color.Cyan)
                                 .height(80.dp)
                                 .fillMaxWidth()
                                 .dragAndDropSource {
-                                    detectTapGestures { offset ->
-                                        startTransfer(
-                                            transferData = DragAndDropTransferData(
-                                                clipData = ClipData.newPlainText(
-                                                    "text",
-                                                    "$index",
+                                    detectTapGestures(
+                                        onLongPress = { offset ->
+                                            println("offset is $offset")
+                                            if(offset.x > 930) {
+                                                startTransfer(
+                                                    transferData = DragAndDropTransferData(
+                                                        clipData = ClipData.newPlainText(
+                                                            "text",
+                                                            "$index",
+                                                        )
+                                                    )
                                                 )
-                                            )
-                                        )
-                                    }
+                                            }
+                                        }
+                                    )
                                 }
                                 .dragAndDropTarget(
                                     shouldStartDragAndDrop = { event ->
@@ -103,25 +118,53 @@ fun MainScaffold() {
                                                             .toString().toInt()
                                                 println("Source is $source")
                                                 println("Target is $index")
-                                                println(components)
+                                                println(cardsLabels)
 
-                                                components[source] = components[index]
+                                                cardsLabels[source] = cardsLabels[index]
                                                             .also {
-                                                                components[index] = components[source]
+                                                                cardsLabels[index] = cardsLabels[source]
                                                             }
+                                                cardsImages[source] = cardsImages[index]
+                                                        .also {
+                                                            cardsImages[index] = cardsImages[source]
+                                                        }
 
-                                                println(components)
+                                                println(cardsLabels)
                                                 return true
                                             }
                                         }
                                     }
                                 )
                     ) {
-                        Text(
-                            text = "$index $component",
-                            fontSize = 40.sp,
-                            color = Color.Black
-                        )
+                        Row(
+                            modifier = Modifier
+                                    .fillMaxSize()
+                        ) {
+                            Image(
+                                painter = painterResource(image),
+                                contentDescription = "No image"
+                            )
+
+
+                            Text(
+                                text = "$index $label",
+                                fontSize = 40.sp,
+                                color = Color.Black,
+                                modifier = Modifier
+                                        .weight(6f)
+                            )
+                            Icon(
+                                painter = painterResource(R.drawable.baseline_drag_indicator_24),
+                                contentDescription = "Draggable",
+                                modifier = Modifier
+                                        .weight(1f)
+                                        .align(Alignment.CenterVertically)
+                            )
+                        }
+
+
+
+
                     }
                 }
             }
@@ -133,4 +176,9 @@ fun MainScaffold() {
             }
         }
     }
+}
+
+fun addCard(cardsLabels : MutableList<String>, cardsImages : MutableList<Int>) {
+    cardsLabels.add("Comp ${cardsLabels.size}")
+    cardsImages.add(R.drawable.default_no_image)
 }
