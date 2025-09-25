@@ -11,6 +11,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.draganddrop.dragAndDropSource
 import androidx.compose.foundation.draganddrop.dragAndDropTarget
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -46,28 +47,66 @@ import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+import androidx.navigation.toRoute
+import kotlinx.serialization.Serializable
+
+
+@Serializable
+object MainRoute
+@Serializable
+data class CardRoute(val image: Int, val label: String)
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            MainScreen()
+            val cardsImages = remember { mutableStateListOf<Int>() }
+            val cardsLabels = remember { mutableStateListOf<String>() }
+
+            val navController = rememberNavController()
+
+            NavHost(
+                navController = navController,
+                startDestination = MainRoute
+            ) {
+                composable<MainRoute> {
+                    MainScreen(
+                        cardsImages,
+                        cardsLabels,
+                        onNavigateToCard = { image, label ->
+                            // Navigate using the serializable route object
+                            navController.navigate(CardRoute(image, label))
+                        }
+                    )
+                }
+
+                composable<CardRoute> { backStackEntry ->
+                    // Extract the route object with type safety
+                    val cardRoute = backStackEntry.toRoute<CardRoute>()
+                    CardScreen(
+                        image = cardRoute.image,
+                        label = cardRoute.label
+                    )
+                }
+            }
+
+//            MainScreen()
         }
     }
 }
 
 @Composable
-fun MainScreen() {
-    val cardsImages = remember { mutableStateListOf<Int>() }
-    val cardsLabels = remember { mutableStateListOf<String>() }
+fun MainScreen(cardsImages: MutableList<Int>, cardsLabels: MutableList<String>, onNavigateToCard: (Int, String) -> Unit) {
     val cardsCombinedInfo = cardsImages.zip(cardsLabels) { image, label ->
         Pair(image, label)
     }
-//    val density = LocalDensity.current
     Scaffold(
         floatingActionButton = {
-            FloatingActionButton(onClick = { addCard(cardsLabels, cardsImages) }) {
+            FloatingActionButton(onClick = { addCard(cardsImages, cardsLabels) }) {
                 Icon(Icons.Default.Add, contentDescription = "Add")
             }
         }
@@ -89,82 +128,73 @@ fun MainScreen() {
                                 .fillMaxWidth()
                                 .dragAndDropSource {
                                     detectTapGestures(
-                                        onLongPress = { offset ->
-                                            println("offset is $offset")
-                                            if(offset.x > 930) {
-                                                startTransfer(
-                                                    transferData = DragAndDropTransferData(
-                                                        clipData = ClipData.newPlainText(
-                                                            "text",
-                                                            "$index",
-                                                        )
+                                        onLongPress = {
+                                            startTransfer(
+                                                transferData = DragAndDropTransferData(
+                                                    clipData = ClipData.newPlainText(
+                                                        "text",
+                                                        "$index",
                                                     )
                                                 )
-                                            }
+                                            )
                                         }
                                     )
                                 }
-                                .dragAndDropTarget(
-                                    shouldStartDragAndDrop = { event ->
-                                        event
-                                                .mimeTypes()
-                                                .contains(ClipDescription.MIMETYPE_TEXT_PLAIN)
-                                    },
-                                    target = remember {
-                                        object : DragAndDropTarget {
-                                            override fun onDrop(event: DragAndDropEvent): Boolean {
-                                                val source =
-                                                    event.toAndroidDragEvent().clipData?.getItemAt(0)?.text
-                                                            .toString().toInt()
-                                                println("Source is $source")
-                                                println("Target is $index")
-                                                println(cardsLabels)
+                                .dragAndDropTarget(shouldStartDragAndDrop = { event ->
+                                    event.mimeTypes().contains(ClipDescription.MIMETYPE_TEXT_PLAIN)
+                                }, target = remember {
+                                    object : DragAndDropTarget {
+                                        override fun onDrop(event: DragAndDropEvent): Boolean {
+                                            val source =
+                                                event.toAndroidDragEvent().clipData?.getItemAt(0)?.text.toString()
+                                                        .toInt()
+                                            println("Source is $source")
+                                            println("Target is $index")
+                                            println(cardsLabels)
 
-                                                cardsLabels[source] = cardsLabels[index]
-                                                            .also {
-                                                                cardsLabels[index] = cardsLabels[source]
-                                                            }
-                                                cardsImages[source] = cardsImages[index]
-                                                        .also {
-                                                            cardsImages[index] = cardsImages[source]
-                                                        }
-
-                                                println(cardsLabels)
-                                                return true
+                                            cardsLabels[source] = cardsLabels[index].also {
+                                                cardsLabels[index] = cardsLabels[source]
                                             }
+                                            cardsImages[source] = cardsImages[index].also {
+                                                cardsImages[index] = cardsImages[source]
+                                            }
+
+                                            println(cardsLabels)
+                                            return true
                                         }
                                     }
-                                )
+                                })
                     ) {
-                        Row(
-                            modifier = Modifier
-                                    .fillMaxSize()
+                        Row(modifier = Modifier
+                                .fillMaxSize()
                         ) {
-                            Image(
-                                painter = painterResource(image),
-                                contentDescription = "No image"
-                            )
-
-
-                            Text(
-                                text = "$index $label",
-                                fontSize = 40.sp,
-                                color = Color.Black,
+                            Row(
                                 modifier = Modifier
-                                        .weight(6f)
-                            )
+                                        .clickable(onClick = {onNavigateToCard(image, label)})
+                                        .fillMaxSize()
+                                        .weight(7f)
+                            ) {
+                                Image(
+                                    painter = painterResource(image),
+                                    contentDescription = "No image"
+                                )
+
+                                Text(
+                                    text = "$index $label",
+                                    fontSize = 40.sp,
+                                    color = Color.Black
+                                )
+                            }
                             Icon(
                                 painter = painterResource(R.drawable.baseline_drag_indicator_24),
                                 contentDescription = "Draggable",
                                 modifier = Modifier
                                         .weight(1f)
                                         .align(Alignment.CenterVertically)
+                                        .fillMaxSize()
+                                        .background(Color.Red)
                             )
                         }
-
-
-
-
                     }
                 }
             }
@@ -178,7 +208,7 @@ fun MainScreen() {
     }
 }
 
-fun addCard(cardsLabels : MutableList<String>, cardsImages : MutableList<Int>) {
-    cardsLabels.add("Comp ${cardsLabels.size}")
+fun addCard(cardsImages: MutableList<Int>, cardsLabels: MutableList<String>) {
     cardsImages.add(R.drawable.default_no_image)
+    cardsLabels.add("Comp ${cardsLabels.size}")
 }
