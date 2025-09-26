@@ -8,6 +8,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.viewModels
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -33,7 +34,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -47,6 +47,7 @@ import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -60,12 +61,13 @@ object MainRoute
 data class CardRoute(val image: Int, val label: String)
 
 class MainActivity : ComponentActivity() {
+
+    private val viewModel by viewModels<MainViewModel>()
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            val cardsImages = remember { mutableStateListOf<Int>() }
-            val cardsLabels = remember { mutableStateListOf<String>() }
 
             val navController = rememberNavController()
 
@@ -75,8 +77,7 @@ class MainActivity : ComponentActivity() {
             ) {
                 composable<MainRoute> {
                     MainScreen(
-                        cardsImages,
-                        cardsLabels,
+                        viewModel,
                         onNavigateToCard = { image, label ->
                             // Navigate using the serializable route object
                             navController.navigate(CardRoute(image, label))
@@ -93,20 +94,15 @@ class MainActivity : ComponentActivity() {
                     )
                 }
             }
-
-//            MainScreen()
         }
     }
 }
 
 @Composable
-fun MainScreen(cardsImages: MutableList<Int>, cardsLabels: MutableList<String>, onNavigateToCard: (Int, String) -> Unit) {
-    val cardsCombinedInfo = cardsImages.zip(cardsLabels) { image, label ->
-        Pair(image, label)
-    }
+fun MainScreen(viewModel: MainViewModel = viewModel(), onNavigateToCard: (Int, String) -> Unit) {
     Scaffold(
         floatingActionButton = {
-            FloatingActionButton(onClick = { addCard(cardsImages, cardsLabels) }) {
+            FloatingActionButton(onClick = { viewModel.addCard() }) {
                 Icon(Icons.Default.Add, contentDescription = "Add")
             }
         }
@@ -119,8 +115,8 @@ fun MainScreen(cardsImages: MutableList<Int>, cardsLabels: MutableList<String>, 
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
 
-            itemsIndexed(cardsCombinedInfo) { index, (image, label) ->
-                key(label, image) {
+            itemsIndexed(viewModel.cardsList) { index, card ->
+                key(card.image, card.label) {
                     Card(
                         shape = RectangleShape,
                         modifier = Modifier
@@ -150,16 +146,10 @@ fun MainScreen(cardsImages: MutableList<Int>, cardsLabels: MutableList<String>, 
                                                         .toInt()
                                             println("Source is $source")
                                             println("Target is $index")
-                                            println(cardsLabels)
+                                            if(source == index){return false}
 
-                                            cardsLabels[source] = cardsLabels[index].also {
-                                                cardsLabels[index] = cardsLabels[source]
-                                            }
-                                            cardsImages[source] = cardsImages[index].also {
-                                                cardsImages[index] = cardsImages[source]
-                                            }
+                                            viewModel.swapCards(source, index)
 
-                                            println(cardsLabels)
                                             return true
                                         }
                                     }
@@ -170,17 +160,17 @@ fun MainScreen(cardsImages: MutableList<Int>, cardsLabels: MutableList<String>, 
                         ) {
                             Row(
                                 modifier = Modifier
-                                        .clickable(onClick = {onNavigateToCard(image, label)})
+                                        .clickable(onClick = {onNavigateToCard(card.image, card.label)})
                                         .fillMaxSize()
                                         .weight(7f)
                             ) {
                                 Image(
-                                    painter = painterResource(image),
+                                    painter = painterResource(card.image),
                                     contentDescription = "No image"
                                 )
 
                                 Text(
-                                    text = "$index $label",
+                                    text = "$index ${card.label}",
                                     fontSize = 40.sp,
                                     color = Color.Black
                                 )
@@ -208,7 +198,3 @@ fun MainScreen(cardsImages: MutableList<Int>, cardsLabels: MutableList<String>, 
     }
 }
 
-fun addCard(cardsImages: MutableList<Int>, cardsLabels: MutableList<String>) {
-    cardsImages.add(R.drawable.default_no_image)
-    cardsLabels.add("Comp ${cardsLabels.size}")
-}
