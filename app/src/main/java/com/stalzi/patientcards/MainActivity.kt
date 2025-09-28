@@ -19,7 +19,7 @@ data class CardRoute(val image: Int, val label: String)
 
 class MainActivity : ComponentActivity() {
 
-    private val viewModel by viewModels<MainViewModel>()
+    private val viewModel: MainViewModel by viewModels { MainViewModelFactory(application.app.repository) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
